@@ -19,7 +19,7 @@ adding `build-apple/llama.xcframework` by dragging and dropping it into the proj
 by manually selecting the framework in the "Frameworks, Libraries, and Embedded Content" section
 of the project settings.
 
-![image](./publication/preview.png)
+ <img src="./publication/preview.png" style="width: 48%" alt="llama.swiftui"/>
 
 Video demonstration:
 
