@@ -131,11 +131,9 @@ class LlamaState: ObservableObject {
     }
     
     func reliseModel() async {
-        guard let llamaContext else {
-            print("Error: init context first")
-            return
-        }
-        await llamaContext.release_context()
+        print("context relise");
+        llamaContext = nil;
+//        await llamaContext.release_context()
     }
     
     func cancelInference() async {
@@ -151,7 +149,10 @@ class LlamaState: ObservableObject {
         }
 
         let t_start = DispatchTime.now().uptimeNanoseconds
-        await llamaContext.inference_init(text: text)
+        let message_list = [
+            LlamaChatMessage(role: "system", content: "You are a Mokpell - helpful assistant. Always respond in Russian.")
+            ,LlamaChatMessage(role: "user", content: text)]
+        await llamaContext.inference_init(message_list: message_list)
         let t_heat_end = DispatchTime.now().uptimeNanoseconds
         let t_heat = Double(t_heat_end - t_start) / NS_PER_S
 

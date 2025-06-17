@@ -84,11 +84,12 @@ actor LlamaContext {
     }
 
     deinit {
-//        llama_sampler_free(sampling)
-//        llama_batch_free(batch)
-//        llama_model_free(model)
-//        llama_free(context)
-//        llama_backend_free()
+        is_done = true
+        llama_sampler_free(sampling)
+        llama_batch_free(batch)
+        llama_model_free(model)
+        llama_free(context)
+        llama_backend_free()
     }
     
     func release_context() {
@@ -100,11 +101,15 @@ actor LlamaContext {
         // скорее всего это приведет к ошибке
         // при повторном обращении к свободному контексту
         // обязательна реинициализация
-         llama_sampler_free(sampling)
-         llama_batch_free(batch)
-         llama_model_free(model)
-         llama_free(context)
-         llama_backend_free()
+        // лучше удалить все ссылки на экземпляр класса
+        // в таком случае будет вызван deinit
+        // и все ресурсы высвободятся
+        
+//         llama_sampler_free(sampling)
+//         llama_batch_free(batch)
+//         llama_model_free(model)
+//         llama_free(context)
+//         llama_backend_free()
     }
 
     static func create_context(
@@ -169,15 +174,12 @@ actor LlamaContext {
         print("canceled by user")
     }
 
-    func inference_init(text: String) {
+    func inference_init(message_list: [LlamaChatMessage], add_bos: Bool = true, clear_token: Bool = true) {
         is_done = false
-        print("attempting to complete \"\(text)\"")
+        print("attempting to complete \"\(message_list)\"")
+        let prompt = formatChatPrompt(messages: message_list, addAssistant: true)
         
-//        let systemMessage = LlamaChatMessage(role: "system", content: "You are a helpful assistant. Always respond in Russian.")
-        let message = LlamaChatMessage.init(role: "user", content: text)
-        let prompt = formatChatPrompt(messages: [message], addAssistant: true)
-        
-        tokens_list = tokenize(text: prompt, add_bos: true)
+        tokens_list = tokenize(text: prompt, add_bos: add_bos, clear_token: clear_token)
         temporary_invalid_cchars = []
 
         let n_ctx = llama_n_ctx(context)
@@ -398,11 +400,11 @@ actor LlamaContext {
         return result;
     }
 
-    private func tokenize(text: String, add_bos: Bool) -> [llama_token] {
+    private func tokenize(text: String, add_bos: Bool, clear_token: Bool = true) -> [llama_token] {
         let utf8Count = text.utf8.count
         let n_tokens = utf8Count + (add_bos ? 1 : 0) + 1
         let tokens = UnsafeMutablePointer<llama_token>.allocate(capacity: n_tokens)
-        let tokenCount = llama_tokenize(vocab, text, Int32(utf8Count), tokens, Int32(n_tokens), add_bos, false)
+        let tokenCount = llama_tokenize(vocab, text, Int32(utf8Count), tokens, Int32(n_tokens), add_bos, clear_token)
 
         var swiftTokens: [llama_token] = []
         for i in 0..<tokenCount {
