@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 56;
+	objectVersion = 70;
 	objects = {
 
 /* Begin PBXBuildFile section */
@@ -50,6 +50,10 @@
 		F1FE20E12B465EC900B45541 /* LoadCustomButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoadCustomButton.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		E113B1282E015D1300A37172 /* llama.cpp.dart */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = llama.cpp.dart; sourceTree = "<group>"; };
+/* End PBXFileSystemSynchronizedRootGroup section */
+
 /* Begin PBXFrameworksBuildPhase section */
 		8A1C83702AC328BD0096AF73 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
@@ -67,6 +71,7 @@
 		8A1C836A2AC328BD0096AF73 = {
 			isa = PBXGroup;
 			children = (
+				E113B1282E015D1300A37172 /* llama.cpp.dart */,
 				8A907F312AC7134E006146EA /* llama.cpp.swift */,
 				8A1C83752AC328BD0096AF73 /* llama.swiftui */,
 				8A39BE082AC7601000BFEB40 /* Frameworks */,

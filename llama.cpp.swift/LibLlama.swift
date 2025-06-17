@@ -47,8 +47,8 @@ actor LlamaContext {
     init(
         model: OpaquePointer,
         context: OpaquePointer,
-        n_ctx: Int = 1024,
-        n_batch: Int = 512,
+        n_ctx: UInt32 = 1024,
+        n_batch: UInt32 = 512,
         n_threads: Int = 1,
         n_threads_batch: Int = 1,
         max_tokens: Int32 = 128,
@@ -118,12 +118,12 @@ actor LlamaContext {
         n_batch: UInt32 = 512,
         n_threads: Int = 1,
         n_threads_batch: Int = 1,
-        max_tokens: Int = 128,
+        max_tokens: Int32 = 128,
         temp: Float = 0.8,
         min_p: Float = 0.05,
         top_p: Float = 0.95,
-        top_k: Int = 40,
-        penalties_last_n: Int = 64,
+        top_k: Int32 = 40,
+        penalties_last_n: Int32 = 64,
         penalties_repeat: Float = 1.1,
         penalties_freq: Float = 0.1,
         penalties_pres: Float = 0.0,
@@ -163,7 +163,23 @@ actor LlamaContext {
             throw LlamaError.couldNotInitializeContext
         }
 
-        return LlamaContext(model: model, context: context)
+        return LlamaContext(
+            model: model,
+            context: context,
+            n_ctx: n_ctx,
+            n_batch: n_batch,
+            n_threads: n_threads,
+            n_threads_batch: n_threads_batch,
+            max_tokens: max_tokens,
+            temp: temp,
+            min_p: min_p,
+            top_p: top_p,
+            top_k: top_k,
+            penalties_last_n: penalties_last_n,
+            penalties_repeat: penalties_repeat,
+            penalties_freq: penalties_freq,
+            penalties_pres: penalties_pres,
+        )
     }
     
     func inference_cancel() {
