@@ -14,6 +14,9 @@ class LlamaState: ObservableObject {
     @Published var cacheCleared = false
     @Published var downloadedModels: [Model] = []
     @Published var undownloadedModels: [Model] = []
+    @Published var messageList: [LlamaChatMessage] = [
+        LlamaChatMessage(role: "system", content: "You are a Mokpell - helpful assistant. Always respond in Russian.")
+    ]
     let NS_PER_S = 1_000_000_000.0
 
     private var llamaContext: LlamaContext?
@@ -149,20 +152,22 @@ class LlamaState: ObservableObject {
         }
 
         let t_start = DispatchTime.now().uptimeNanoseconds
-        let message_list = [
-            LlamaChatMessage(role: "system", content: "You are a Mokpell - helpful assistant. Always respond in Russian.")
-            ,LlamaChatMessage(role: "user", content: text)]
-        await llamaContext.inference_init(message_list: message_list)
+//        let message_list = [
+//            LlamaChatMessage(role: "system", content: "You are a Mokpell - helpful assistant. Always respond in Russian.")
+//            ,LlamaChatMessage(role: "user", content: text)]
+        self.messageList.append(LlamaChatMessage(role: "user", content: text))
+        await llamaContext.inference_init(message_list: self.messageList)
         let t_heat_end = DispatchTime.now().uptimeNanoseconds
         let t_heat = Double(t_heat_end - t_start) / NS_PER_S
 
-        messageLog += "\(text)"
-
+        messageLog += "\nUser: \(text)\n\n"
+        var resultString: String = "\nAssistant: \n"
         Task.detached {
             while await !llamaContext.is_done {
                 let result = await llamaContext.inference_loop()
                 await MainActor.run {
                     self.messageLog += "\(result)"
+                    resultString += result
                 }
             }
 
@@ -179,6 +184,7 @@ class LlamaState: ObservableObject {
                     Heat up took \(t_heat)s
                     Generated \(tokens_per_second) t/s\n
                     """
+                self.messageList.append(LlamaChatMessage(role: "assistant", content: resultString))
             }
         }
     }
@@ -218,6 +224,7 @@ class LlamaState: ObservableObject {
         }
 
         await llamaContext.clear()
-        messageLog = ""
+        messageLog = "";
+        messageList = [];
     }
 }

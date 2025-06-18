@@ -15,9 +15,9 @@
 		8A1C837B2AC328BE0096AF73 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 8A1C837A2AC328BE0096AF73 /* Assets.xcassets */; };
 		8A39BE0A2AC7601100BFEB40 /* Accelerate.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 8A39BE092AC7601000BFEB40 /* Accelerate.framework */; };
 		8A9F7C4D2AC332EE008AE1EA /* LlamaState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A9F7C4C2AC332EE008AE1EA /* LlamaState.swift */; };
+		E1528A902E020BF90001643E /* LibLlama.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1528A8E2E020BEA0001643E /* LibLlama.swift */; };
 		E15C24792E008E4100B2A65D /* llama.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = E1AFACC02E008B5000AA29D7 /* llama.xcframework */; };
 		E15C247A2E008E4100B2A65D /* llama.xcframework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = E1AFACC02E008B5000AA29D7 /* llama.xcframework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
-		E16F0E9B2E00B1B500BA61A7 /* LibLlama.swift in Sources */ = {isa = PBXBuildFile; fileRef = E16F0E9A2E00AF3600BA61A7 /* LibLlama.swift */; };
 		F1FE20E22B465ECA00B45541 /* LoadCustomButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1FE20E12B465EC900B45541 /* LoadCustomButton.swift */; };
 /* End PBXBuildFile section */
 
@@ -44,8 +44,8 @@
 		8A1C837A2AC328BE0096AF73 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		8A39BE092AC7601000BFEB40 /* Accelerate.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Accelerate.framework; path = System/Library/Frameworks/Accelerate.framework; sourceTree = SDKROOT; };
 		8A9F7C4C2AC332EE008AE1EA /* LlamaState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LlamaState.swift; sourceTree = "<group>"; };
+		E1528A8E2E020BEA0001643E /* LibLlama.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibLlama.swift; sourceTree = "<group>"; };
 		E15C24782E008E4100B2A65D /* llama.swiftui.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = llama.swiftui.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		E16F0E9A2E00AF3600BA61A7 /* LibLlama.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibLlama.swift; sourceTree = "<group>"; };
 		E1AFACC02E008B5000AA29D7 /* llama.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; path = llama.xcframework; sourceTree = "<group>"; };
 		F1FE20E12B465EC900B45541 /* LoadCustomButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoadCustomButton.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -103,7 +103,7 @@
 		8A907F312AC7134E006146EA /* llama.cpp.swift */ = {
 			isa = PBXGroup;
 			children = (
-				E16F0E9A2E00AF3600BA61A7 /* LibLlama.swift */,
+				E1528A8E2E020BEA0001643E /* LibLlama.swift */,
 			);
 			path = llama.cpp.swift;
 			sourceTree = "<group>";
@@ -202,7 +202,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				E16F0E9B2E00B1B500BA61A7 /* LibLlama.swift in Sources */,
+				E1528A902E020BF90001643E /* LibLlama.swift in Sources */,
 				F1FE20E22B465ECA00B45541 /* LoadCustomButton.swift in Sources */,
 				8A9F7C4D2AC332EE008AE1EA /* LlamaState.swift in Sources */,
 				8A1C83792AC328BD0096AF73 /* ContentView.swift in Sources */,

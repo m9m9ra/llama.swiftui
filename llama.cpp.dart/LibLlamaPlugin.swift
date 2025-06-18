@@ -1,65 +1,91 @@
-import Flutter
-import UIKit
-import llama // Импортируй библиотеку llama
-import Metal
 import CommonCrypto
+import Flutter
+import Metal
+import UIKit
+import llama
 
-public class LibLlamaPlugin: NSObject, FlutterPlugin, FlutterStreamHandler {
-    private var llamaContexts: [NSNumber: LlamaContext] = [:]
+@available(iOS 13, *) // if #available(iOS 13, *)
+public class LibLlamaPlugin: NSObject, FlutterStreamHandler, ObservableObject {
+    private let channelName = "lib.llama"
+    private let eventChannelName = "lib.llama.event"
+
+    private var llamaContext: LlamaContext?
+    
     private var eventSink: FlutterEventSink?
-    private let llamaQueue = DispatchQueue(label: "lib.llama.swift", attributes: .serial)
+    private let llamaQueue = DispatchQueue(label: "lib.llama")
 
-    public static func register(with registrar: FlutterPluginRegistrar) {
-        let channel = FlutterMethodChannel(name: "lib.llama.swift", binaryMessenger: registrar.messenger())
-        let eventChannel = FlutterEventChannel(name: "lib.llama.swift.event", binaryMessenger: registrar.messenger())
-        let instance = MyLlamaPlugin()
-        registrar.addMethodCallDelegate(instance, channel: channel)
-        eventChannel.setStreamHandler(instance)
+    private let methodChannel: FlutterMethodChannel
+    private let eventChannel: FlutterEventChannel
+
+    private var messageList: [LlamaChatMessage] = []
+
+    init(messenger: FlutterBinaryMessenger, eventChannel: FlutterEventChannel) {
+        let taskQueue = messenger.makeBackgroundTaskQueue?()
+
+        methodChannel = FlutterMethodChannel(
+            name: "lib.llama",
+            binaryMessenger: messenger,
+            codec: FlutterStandardMethodCodec.sharedInstance(),
+            taskQueue: taskQueue
+        )
+        self.eventChannel = eventChannel
     }
 
-    public func onListen(withArguments arguments: Any?, eventSink events: @escaping FlutterEventSink) -> FlutterError? {
-        eventSink = events
-        return nil
+    func setMethodCallHandler() {
+        methodChannel.setMethodCallHandler(handle)
     }
 
-    public func onCancel(withArguments arguments: Any?) -> FlutterError? {
-        eventSink = nil
-        return nil
-    }
-
-    public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
+    private func handle(call: FlutterMethodCall, result: @escaping FlutterResult) {
         switch call.method {
         case "initContext":
-            handleInitContext(call: call, result: result)
+            self.handleInitContext(call: call, result: result)
         case "completion":
-            handleCompletion(call: call, result: result)
+            self.handleCompletion(call: call, result: result)
         case "stopCompletion":
-            handleStopCompletion(call: call, result: result)
+            self.handleStopCompletion(call: call, result: result)
         case "tokenize":
-            handleTokenize(call: call, result: result)
+            self.handleTokenize(call: call, result: result)
         case "detokenize":
-            handleDetokenize(call: call, result: result)
+            self.handleDetokenize(call: call, result: result)
         case "bench":
-            handleBench(call: call, result: result)
+            self.handleBench(call: call, result: result)
         case "releaseContext":
-            handleReleaseContext(call: call, result: result)
+            self.handleReleaseContext(call: call, result: result)
         default:
             result(FlutterMethodNotImplemented)
         }
     }
 
-    private func handleInitContext(call: FlutterMethodCall, result: @escaping FlutterResult) {
+    public func onListen(
+        withArguments arguments: Any?, eventSink events: @escaping FlutterEventSink
+    ) -> FlutterError? {
+        self.eventSink = events
+        return nil
+    }
+
+    public func onCancel(withArguments arguments: Any?) -> FlutterError? {
+        self.eventSink = nil
+        return nil
+    }
+
+    public func handleInitContext(call: FlutterMethodCall, result: @escaping FlutterResult) {
         guard let params = call.arguments as? [String: Any],
-              let modelPath = params["modelPath"] as? String else {
-            result(FlutterError(code: "INVALID_ARGS", message: "Model path is required", details: nil))
+            let modelPath = params["modelPath"] as? String
+        else {
+            result(
+                FlutterError(code: "INVALID_ARGS", message: "Model path is required", details: nil))
             return
         }
+        // Если ты долбоеб попробуешь дважды заинитить контекст я тебя защищу ^_^
+        llamaContext = nil
 
-        let emitLoadProgress = params["emit_load_progress"] as? Bool ?? false
+        // Но ты все же странный если читаешь че я тут наговнакодил
         let useGGMLBackend = params["use_ggml_backend"] as? Bool ?? false
         let nCtx = params["n_ctx"] as? UInt32 ?? 1024
+        
+        // а еще если ты воткнешь сюда 64 - то это не будет работать никогда
         let nBatch = params["n_batch"] as? UInt32 ?? 512
-        let maxTokens = params["max_tokens"] as? Int32 ?? 128
+        let maxTokens = params["max_tokens"] as? Int32 ?? 256
         let temp = params["temp"] as? Float ?? 0.8
         let minP = params["min_p"] as? Float ?? 0.05
         let topP = params["top_p"] as? Float ?? 0.95
@@ -70,7 +96,7 @@ public class LibLlamaPlugin: NSObject, FlutterPlugin, FlutterStreamHandler {
         let penaltiesPres = params["penalties_pres"] as? Float ?? 0.0
 
         do {
-            let context = try LlamaContext.create_context(
+            llamaContext = try LlamaContext.create_context(
                 model_path: modelPath,
                 n_ctx: nCtx,
                 n_batch: nBatch,
@@ -86,173 +112,183 @@ public class LibLlamaPlugin: NSObject, FlutterPlugin, FlutterStreamHandler {
                 use_ggml_backend: useGGMLBackend
             )
 
-            // Проверяем поддержку Metal
             let metalDevice = MTLCreateSystemDefaultDevice()
             let isMetalEnabled = metalDevice != nil
             let reasonNoMetal = isMetalEnabled ? "" : "Metal not supported on this device"
 
-            // Генерируем уникальный contextId
-            let contextId = Double.random(in: 0..<1000000)
-            let contextIdNumber = NSNumber(value: contextId)
-            llamaContexts[contextIdNumber] = context
-
-            // Отправляем прогресс загрузки, если требуется
-            if emitLoadProgress {
-                DispatchQueue.main.async { [weak self] in
-                    self?.eventSink?([
-                        "function": "loadProgress",
-                        "contextId": "",
-                        "result": 100 // Предполагаем, что загрузка завершена
-                    ])
-                }
-            }
-
             result([
-                "contextId": contextIdNumber,
                 "gpu": isMetalEnabled,
                 "reasonNoGPU": reasonNoMetal,
-                "model": context.model_info()
+                "model": "model_info",
             ])
         } catch {
-            result(FlutterError(code: "INIT_ERROR", message: "Failed to initialize Llama: \(error)", details: nil))
+            result(
+                FlutterError(
+                    code: "INIT_ERROR", message: "Failed to initialize Llama: \(error)",
+                    details: nil))
         }
     }
 
-    private func handleCompletion(call: FlutterMethodCall, result: @escaping FlutterResult) {
+    public func handleCompletion(call: FlutterMethodCall, result: @escaping FlutterResult) {
         guard let args = call.arguments as? [String: Any],
-              let contextId = args["contextId"] as? Double,
-              let params = args["params"] as? [String: Any],
-              let messages = params["messages"] as? [[String: String]] else {
+            let params = args["params"] as? [String: Any],
+            let messages = params["messages"] as? [[String: String]]
+        else {
             result(FlutterError(code: "INVALID_ARGS", message: "Invalid arguments", details: nil))
             return
         }
+        
 
-        let contextIdNumber = NSNumber(value: contextId)
-        guard let context = llamaContexts[contextIdNumber] else {
-            result(FlutterError(code: "CONTEXT_NOT_FOUND", message: "Context not found", details: nil))
+        let emitRealtimeCompletion = params["emit_realtime_completion"] as? Bool ?? true
+        guard let llamaContext else {
             return
         }
+        
 
-        let emitRealtimeCompletion = params["emit_realtime_completion"] as? Bool ?? false
+            Task.detached {
+                // Ну если ты все же попытаешься дважды запустить инфиренс - то ты точно странный тип
+                if await !llamaContext.is_done {
+                    result(FlutterError(code: "INVALID_ARGS", message: "Invalid arguments", details: nil))
+                    return
+                }
+                
+                // а вот стрингой ли они приходят - это уже вопрос хороший
+                let chatMessages = messages.map {
+                    LlamaChatMessage(role: String($0["role"] ?? "") , content: String($0["message"] ?? ""))
+                }
+                await llamaContext.inference_init(message_list: chatMessages)
 
-        llamaQueue.async { [weak self] in
-            let chatMessages = messages.map { LlamaChatMessage(role: $0["role"] ?? "", content: $0["content"] ?? "") }
-            context.inference_init(message_list: chatMessages)
+                var completionResult = ""
 
-            var completionResult = ""
-            while !context.is_done {
-                let token = context.inference_loop()
-                completionResult += token
+                // Основной цикл генерации
+                while await !llamaContext.is_done {
+                    let token = await llamaContext.inference_loop()
+                    completionResult += token
 
-                if emitRealtimeCompletion {
-                    DispatchQueue.main.async {
-                        self?.eventSink?([
-                            "function": "completion",
-                            "contextId": contextId,
-                            "result": ["text": token]
-                        ])
+                    if emitRealtimeCompletion {
+                        DispatchQueue.main.async { [weak self] in
+                            self!.eventSink?([
+                                "done": false,
+                                "function": "completion",
+                                "result": ["text": completionResult],
+                            ])
+                        }
                     }
                 }
-            }
 
-            result(["text": completionResult])
-        }
+                DispatchQueue.main.async {
+                    result([
+                        "done": true,
+                        "function": "completion",
+                        "result": ["text": completionResult],
+                    ])
+                }
+                await llamaContext.clear()
+            }
     }
 
     private func handleStopCompletion(call: FlutterMethodCall, result: @escaping FlutterResult) {
         guard let args = call.arguments as? [String: Any],
-              let contextId = args["contextId"] as? Double else {
-            result(FlutterError(code: "INVALID_ARGS", message: "Context ID is required", details: nil))
+            let contextId = args["contextId"] as? Double
+        else {
+            result(
+                FlutterError(code: "INVALID_ARGS", message: "Context ID is required", details: nil))
             return
         }
 
         let contextIdNumber = NSNumber(value: contextId)
-        guard let context = llamaContexts[contextIdNumber] else {
-            result(FlutterError(code: "CONTEXT_NOT_FOUND", message: "Context not found", details: nil))
+        guard let llamaContext else {
+            result(
+                FlutterError(code: "CONTEXT_NOT_FOUND", message: "Context not found", details: nil))
+            return
+        }
+        Task {
+            await llamaContext.inference_cancel()
+            DispatchQueue.main.async {
+                result(nil)
+            }
+        }
+
+        result(nil)
+    }
+
+    private func handleReleaseContext(call: FlutterMethodCall, result: @escaping FlutterResult) {
+        guard let args = call.arguments as? [String: Any]
+        else {
+            result(
+                FlutterError(code: "INVALID_ARGS", message: "Context ID is required", details: nil))
             return
         }
 
-        context.inference_cancel()
+        llamaContext = nil
         result(nil)
     }
 
     private func handleTokenize(call: FlutterMethodCall, result: @escaping FlutterResult) {
         guard let args = call.arguments as? [String: Any],
-              let contextId = args["contextId"] as? Double,
-              let text = args["text"] as? String else {
-            result(FlutterError(code: "INVALID_ARGS", message: "Context ID and text are required", details: nil))
+            let contextId = args["contextId"] as? Double,
+            let text = args["text"] as? String
+        else {
+            result(
+                FlutterError(
+                    code: "INVALID_ARGS", message: "Context ID and text are required", details: nil)
+            )
             return
         }
 
         let contextIdNumber = NSNumber(value: contextId)
-        guard let context = llamaContexts[contextIdNumber] else {
-            result(FlutterError(code: "CONTEXT_NOT_FOUND", message: "Context not found", details: nil))
+        guard let llamaContext else {
+            result(
+                FlutterError(code: "CONTEXT_NOT_FOUND", message: "Context not found", details: nil))
             return
         }
 
-        let tokens = context.tokenize(text: text, add_bos: true)
-        result(["tokens": tokens.map { Int($0) }])
+        Task {
+            let tokens = await llamaContext.tokenize(text: text, add_bos: true)
+            DispatchQueue.main.async {
+                result(["tokens": tokens.map { Int($0) }])
+            }
+        }
     }
 
     private func handleDetokenize(call: FlutterMethodCall, result: @escaping FlutterResult) {
         guard let args = call.arguments as? [String: Any],
-              let contextId = args["contextId"] as? Double,
-              let tokens = args["tokens"] as? [Int] else {
-            result(FlutterError(code: "INVALID_ARGS", message: "Context ID and tokens are required", details: nil))
+            let contextId = args["contextId"] as? Double,
+            let tokens = args["tokens"] as? [Int]
+        else {
+            result(
+                FlutterError(
+                    code: "INVALID_ARGS", message: "Context ID and tokens are required",
+                    details: nil))
             return
         }
-
-        let contextIdNumber = NSNumber(value: contextId)
-        guard let context = llamaContexts[contextIdNumber] else {
-            result(FlutterError(code: "CONTEXT_NOT_FOUND", message: "Context not found", details: nil))
-            return
-        }
-
-        let detokenized = tokens.map { context.token_to_piece(token: llama_token($0)) }
-            .flatMap { $0 }
-            .map { Character(UnicodeScalar(UInt8($0))) }
-            .reduce("") { $0 + String($1) }
-        result(detokenized)
     }
 
     private func handleBench(call: FlutterMethodCall, result: @escaping FlutterResult) {
         guard let args = call.arguments as? [String: Any],
-              let contextId = args["contextId"] as? Double,
-              let pp = args["pp"] as? Double,
-              let tg = args["tg"] as? Double,
-              let pl = args["pl"] as? Double,
-              let nr = args["nr"] as? Double else {
+            let contextId = args["contextId"] as? Double,
+            let pp = args["pp"] as? Double,
+            let tg = args["tg"] as? Double,
+            let pl = args["pl"] as? Double,
+            let nr = args["nr"] as? Double
+        else {
             result(FlutterError(code: "INVALID_ARGS", message: "Invalid arguments", details: nil))
             return
         }
 
         let contextIdNumber = NSNumber(value: contextId)
-        guard let context = llamaContexts[contextIdNumber] else {
-            result(FlutterError(code: "CONTEXT_NOT_FOUND", message: "Context not found", details: nil))
+        guard let llamaContext else {
+            result(
+                FlutterError(code: "CONTEXT_NOT_FOUND", message: "Context not found", details: nil))
             return
         }
-
-        let benchResult = context.bench(pp: Int(pp), tg: Int(tg), pl: Int(pl), nr: Int(nr))
-        result(benchResult)
-    }
-
-    private func handleReleaseContext(call_id: String, result: @escaping FlutterResult) {
-        guard let args = call.arguments as? [String: Any],
-              let contextId = args["contextId"] as? Double else {
-            result(FlutterError(code: "INVALID_ARGS", message: "Context ID is required", details: nil))
-            return
+        Task {
+            let benchResult = await llamaContext.bench(
+                pp: Int(pp), tg: Int(tg), pl: Int(pl), nr: Int(nr))
+            DispatchQueue.main.async {
+                result("benchResult")
+            }
         }
 
-        let contextIdNumber = NSNumber(value: contextId)
-        guard let context = llamaContexts[contextIdNumber] else {
-            result(FlutterError(code: "CONTEXT_NOT_FOUND", message: "Context not found", details: nil))
-            return
-        }
-
-        context.inference_cancel()
-        llamaQueue.sync {}
-        context.release_context()
-        llamaContexts.removeValue(forKey: contextIdNumber)
-        result(nil)
     }
 }

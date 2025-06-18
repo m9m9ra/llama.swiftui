@@ -58,7 +58,7 @@ struct ContentView: View {
                 }.padding()
 
             }
-            .navigationBarTitle("Model Settings", displayMode: .inline)
+            .navigationBarTitle("Mokpell mini", displayMode: .inline)
             .toolbar{
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Relise ctx") {
